@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: outbox
+      POSTGRES_USER: outbox
+      POSTGRES_PASSWORD: outbox
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U outbox -d outbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nats:
+    image: nats:2-alpine
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app1:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      OUTBOX_LEADER: "true"
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck: &app-healthcheck
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8080'"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 10s
+
+  app2:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      OUTBOX_LEADER: "false"
+    ports:
+      - "8082:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
+
+  app3:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      OUTBOX_LEADER: "false"
+    ports:
+      - "8083:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
+
+volumes:
+  postgres-data:
+  nats-data:
