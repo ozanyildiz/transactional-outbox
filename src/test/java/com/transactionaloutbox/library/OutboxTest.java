@@ -1,6 +1,6 @@
 package com.transactionaloutbox.library;
 
-import com.transactionaloutbox.library.dispatcher.OutboxDispatcherScheduler;
+import com.transactionaloutbox.library.dispatcher.OutboxDispatcher;
 import com.transactionaloutbox.library.repository.OutboxRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,14 +19,14 @@ import static org.mockito.Mockito.verify;
 class OutboxTest {
 
     private OutboxRepository repository;
-    private OutboxDispatcherScheduler scheduler;
+    private OutboxDispatcher dispatcher;
     private Outbox outbox;
 
     @BeforeEach
     void setUp() {
         repository = mock(OutboxRepository.class);
-        scheduler = mock(OutboxDispatcherScheduler.class);
-        outbox = new Outbox(repository, scheduler, new AfterCommitWakeup());
+        dispatcher = mock(OutboxDispatcher.class);
+        outbox = new Outbox(repository, dispatcher, new AfterCommitWakeup(Runnable::run));
     }
 
     @AfterEach
@@ -53,18 +53,18 @@ class OutboxTest {
     }
 
     @Test
-    void withinTransactionDefersWakeupUntilAfterCommit() {
+    void withinTransactionDefersPublishingUntilAfterCommit() {
         beginTransaction();
 
         outbox.stage("payment.requested", new Object());
 
-        verify(scheduler, never()).wakeUp();
+        verify(dispatcher, never()).publishPendingMessages();
 
         List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
         assertThat(synchronizations).hasSize(1);
         synchronizations.get(0).afterCommit();
 
-        verify(scheduler).wakeUp();
+        verify(dispatcher).publishPendingMessages();
     }
 
     @Test
@@ -76,6 +76,6 @@ class OutboxTest {
                 .hasMessageContaining("active transaction");
 
         verify(repository, never()).add("payment.requested", payload);
-        verify(scheduler, never()).wakeUp();
+        verify(dispatcher, never()).publishPendingMessages();
     }
 }

@@ -14,7 +14,7 @@ import static org.mockito.Mockito.verify;
 
 class AfterCommitWakeupTest {
 
-    private final AfterCommitWakeup afterCommitWakeup = new AfterCommitWakeup();
+    private final AfterCommitWakeup afterCommitWakeup = new AfterCommitWakeup(Runnable::run);
 
     @AfterEach
     void tearDown() {
@@ -28,7 +28,7 @@ class AfterCommitWakeupTest {
         TransactionSynchronizationManager.initSynchronization();
         Runnable action = mock(Runnable.class);
 
-        afterCommitWakeup.trigger(action);
+        afterCommitWakeup.triggerAsync(action);
 
         verify(action, never()).run();
 
@@ -43,7 +43,7 @@ class AfterCommitWakeupTest {
     void withoutTransactionRunsActionImmediately() {
         Runnable action = mock(Runnable.class);
 
-        afterCommitWakeup.trigger(action);
+        afterCommitWakeup.triggerAsync(action);
 
         verify(action).run();
     }

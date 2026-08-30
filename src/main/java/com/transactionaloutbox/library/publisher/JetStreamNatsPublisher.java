@@ -28,6 +28,7 @@ public class JetStreamNatsPublisher implements MessagePublisher {
     @Override
     public void publish(OutboxMessage message) {
         Headers headers = new Headers();
+        // Enables stream-level deduplication so outbox retries don't cause duplicate delivery (default 2 mins)
         headers.add(NatsJetStreamConstants.MSG_ID_HDR, message.id().toString());
         try {
             PublishAck ack = jetStream.publish(message.subject(), headers, message.payload().getBytes(StandardCharsets.UTF_8));
